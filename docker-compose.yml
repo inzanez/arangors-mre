@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+    catalog:
+        ### CREATED=$(date -u +'%Y-%m-%dT%H:%M:%SZ') VERSION=$(grep -m1 -o '[0-9].[0-9].[0-9]' Cargo.toml) docker-compose up -d
+        build:
+            context: .
+            dockerfile: ./Dockerfile.alpine
+            args:
+                LOCAL: 'true'
+                GIT_REF: master/origin
+        restart: unless-stopped
+        depends_on:
+            - db
+        ports:
+            - 8000:8000
+        environment:
+            ARA_LOG_LEVEL: debug  # Available levels are: off, critical, normal, debug
+            ARA_ADDRESS: 0.0.0.0
+            ARA_DATABASES.CATALOG.URL: "http://db:8529"
+            ARA_DATABASES.CATALOG.USERNAME: "root"
+            ARA_DATABASES.CATALOG.PASSWORD: "super_secret_mega_heavy_secure_password"
+            ARA_DATABASES.CATALOG.USE_JWT: 'true'
+
+    db:
+        image: arangodb:3.7.2
+        restart: unless-stopped
+        ports:
+            - 8529:8529
+        volumes:
+            - db_data:/var/lib/arangodb3
+            - db_apps:/var/lib/arangodb3-apps
+        environment:
+            ARANGO_ROOT_PASSWORD: super_secret_mega_heavy_secure_password
+            # ARANGO_NO_AUTH: 1  # DON'T use this in production
+            # ARANGO_STORAGE_ENGINE: rocksdb
+            # ARANGODB_OVERRIDE_DETECTED_NUMBER_OF_CORES: 2
+            ARANGODB_OVERRIDE_DETECTED_TOTAL_MEMORY: 2G
+
+
+volumes:
+    db_data:
+    db_apps:

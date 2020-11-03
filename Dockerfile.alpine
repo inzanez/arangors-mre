@@ -3,24 +3,42 @@
 #   https://whitfin.io/speeding-up-rust-docker-builds/
 ##########################  BUILD IMAGE  ##########################
 # Musl build image to build portals statically compiled binary
-FROM rust:1.47-alpine3.12 as builder
+FROM alpine:3.12 as builder
 
-# Build time options to avoid dpkg warnings and help with reproducible builds.
-ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 TZ=UTC TERM=xterm-256color
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
 
-# Don't download Rust docs
-RUN rustup set profile minimal
 ENV USER "root"
 ENV RUSTFLAGS='-C link-arg=-s'
+ENV OPENSSL_STATIC yes
+ENV OPENSSL_LIB_DIR "/openssl/lib"
+ENV OPENSSL_INCLUDE_DIR "/openssl/include"
 
-# Install packages needed for compilation
-RUN apk add --no-cache \
-        musl-dev \
-        openssl-dev
+RUN set -eux; \
+    apk add --no-cache \
+    ca-certificates \
+    gcc \
+    g++ \
+    musl-dev \
+    libtool \
+    cmake \
+    make; \
+    \
+    url="https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-musl/rustup-init"; \
+    wget "$url"; \
+    chmod +x rustup-init; \
+    ./rustup-init -y --no-modify-path --default-toolchain nightly; \
+    rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup --version; \
+    cargo --version; \
+    rustc --version;
 
-# Add musl target, as we want to run your project in
-# an alpine linux image
-RUN rustup target add x86_64-unknown-linux-musl
+COPY build_libressl.sh /build_libressl.sh
+RUN sh /build_libressl.sh
+
+RUN rm -rf /libressl*
 
 # Specifies if the local project is build or if it gets build
 # from the official git repository. Defaults to the git repo.
@@ -59,8 +77,7 @@ ARG GIT_REF=origin/master
 
 RUN apk add --no-cache \
         curl \
-        ca-certificates \
-        openssl
+        ca-certificates
 
 EXPOSE 8080
 
